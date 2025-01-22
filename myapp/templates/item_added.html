@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Item Added</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container mt-5">
+    <h1 class="mb-4">Item Successfully Added</h1>
+
+    <div class="card">
+      <div class="card-header">
+        Item Details
+      </div>
+      <div class="card-body">
+        <p><strong>Name:</strong> {{ item.name }}</p>
+        <p><strong>Category:</strong> {{ item.category.name }}</p>
+        <p><strong>Brand:</strong> {{ item.brand.name }}</p>
+        <p><strong>Price:</strong> ${{ item.price }}</p>
+        <p><strong>Color:</strong> 
+          {% for color in item.color.all %}
+            {{ color.name }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </p>
+        {% if item.image %}
+          <p><strong>Image:</strong></p>
+          <img src="{{ item.image.url }}" alt="{{ item.name }}" class="img-thumbnail" style="max-width: 300px;">
+        {% else %}
+          <p><strong>Image:</strong> No image uploaded.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <a href="{% url 'add_item' %}" class="btn btn-primary">Add Another Item</a>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+{% endblock %}

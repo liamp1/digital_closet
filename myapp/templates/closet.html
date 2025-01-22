@@ -1,0 +1,662 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Closet</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <style>
+    .sidebar {
+      position: sticky; /* Keeps it in view while scrolling */
+      top: 20px; /* Adjust the distance from the top */
+      padding: 20px;
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      height: fit-content; /* Ensures the sidebar's height adjusts to its content */
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: Adds a subtle shadow */
+    }
+    
+    .sidebar h5 {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+    
+    .sidebar .form-control {
+      margin-bottom: 10px;
+    }
+    
+    .color-buttons-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .color-button {
+      display: flex;
+      align-items: center;
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f8f9fa;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .color-square {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      border-radius: 3px;
+      border: 1px solid #ccc;
+    }
+    
+    .color-button.selected {
+      border: 2px solid #007BFF;
+      background-color: #E7F1FF;
+    }
+    
+    .color-button:hover {
+      background-color: #e9ecef;
+    }
+    
+    .item-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px; /* Adjust spacing between items */
+      justify-content: flex-start;
+    }
+
+    .item-card {
+      width: 250px; /* Fixed width */
+      height: 290px; /* Fixed height */
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .item-card:hover {
+      transform: scale(1.05);
+    }
+
+    .item-image {
+      width: 100%;
+      aspect-ratio: 1 / 1; /* Maintains 1:1 ratio for images */
+      object-fit: cover;
+    }
+
+    .item-brand {
+      text-align: center; /* Center the text */
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      margin-top: 10px;
+      display: block; /* Ensure the text is treated as a block element */
+    }
+    
+    .notification-popup {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1050;
+      width: auto;
+      max-width: 300px;
+      opacity: 1;
+      animation: fadeOut 4s forwards;
+    }
+    
+    @keyframes fadeOut {
+      0% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="sidebar">
+          <h5>Filter</h5>
+          <div class="mb-3">
+            <label for="filter-brand">Brand</label>
+            <select id="filter-brand" class="form-control" onchange="applyFilters()">
+              <option value="">All Brands</option>
+              {% for brand in brands %}
+              <option value="{{ brand.name }}">{{ brand.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="filter-color">Color</label>
+            <select id="filter-color" class="form-control" onchange="applyFilters()">
+              <option value="">All Colors</option>
+              {% for color in colors %}
+              <option value="{{ color.name }}">{{ color.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <h5>Sort</h5>
+          <div class="mb-3">
+            <label for="sort-options">Sort By</label>
+            <select id="sort-options" class="form-control" onchange="applySort()">
+              <option value="recent">Recently Added</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="category">Category</option>
+              <option value="color">Color</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-9">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h1>My Closet</h1>
+          <a href="/closet/add-item" class="btn btn-primary">Add Item</a>
+        </div>
+        {% if messages %}
+        <div id="notification-popup" class="notification-popup">
+          {% for message in messages %}
+          <div class="alert alert-success" role="alert">{{ message }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div id="item-grid" class="item-grid">
+          {% for item in items %}
+          <div id="item-card-{{ item.id }}" 
+               class="item-card" 
+               data-id="{{ item.id }}" 
+               data-price="{{ item.price|default:'' }}" 
+               data-category="{{ item.category.name|default:'' }}" 
+               data-color="{{ item.color_names|join:','|default:''|lower }}"
+               onclick="openEditModal('{{ item.id }}')">
+            {% if item.image %}
+            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
+            {% else %}
+            <div class="item-image" style="background-color: #e9ecef; display: flex; align-items: center; justify-content: center;">
+              <span>No Image</span>
+            </div>
+            {% endif %}
+            <div class="item-brand">{{ item.brand.name }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="editItemModal" tabindex="-1" role="dialog" aria-labelledby="editItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editItemModalLabel">Edit Item</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <form id="editItemForm" method="POST" enctype="multipart/form-data" action="/closet/edit-item/">
+          {% csrf_token %}
+          <div class="modal-body">
+            <input type="hidden" id="editItemId" name="item_id">
+            <div class="form-group">
+              <label for="editItemImage">Image</label>
+              <input type="file" class="form-control-file" id="editItemImage" name="image">
+            </div>
+            <div class="form-group">
+              <label for="editItemName">Name</label>
+              <input type="text" class="form-control" id="editItemName" name="name">
+            </div>
+            <div class="form-group">
+              <label for="editItemBrand">Brand</label>
+              <input type="text" class="form-control" id="editItemBrand" name="brand">
+              <div class="mt-2">
+                <div id="brand-buttons">
+                  {% for brand in brands %}
+                  <button type="button" class="btn btn-outline-primary m-1" onclick="selectBrand('{{ brand.name }}')">{{ brand.name }}</button>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="editItemColor">Color</label>
+              <div id="color-buttons-modal" class="color-buttons-container"></div>
+              <input type="hidden" id="editItemColor" name="color">
+            </div>
+            <div class="form-group">
+              <label for="editItemPrice">Price ($)</label>
+              <input type="number" step="0.01" class="form-control" id="editItemPrice" name="price">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <div id="category-container-modal" class="mt-3"></div>
+              <input type="hidden" name="category" id="editItemCategory">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" form="editItemForm" class="btn btn-primary">Save Changes</button>
+            <form id="deleteItemForm" method="POST" action="{% url 'delete_item' %}" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" id="deleteItemId" name="item_id">
+              <button type="button" class="btn btn-danger" onclick="deleteItem()">Delete Item</button>
+            </form>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+</body>
+  <script>
+    function applyFilters() {
+      const selectedBrand = document.getElementById('filter-brand').value.toLowerCase();
+      const selectedColor = document.getElementById('filter-color').value.toLowerCase();
+
+      console.log('Selected Brand:', selectedBrand); // Check selected brand
+      console.log('Selected Color:', selectedColor); // Check selected color
+
+      const items = document.querySelectorAll('.item-card');
+      items.forEach(item => {
+        const brand = item.querySelector('.item-brand').textContent.toLowerCase();
+        const colors = item.dataset.color ? item.dataset.color.toLowerCase().split(',') : []; // Split colors into an array
+
+        console.log('Item ID:', item.dataset.id); // Debug item ID
+        console.log('Item Brand:', brand); // Debug item brand
+        console.log('Item Colors:', colors); // Debug item colors
+
+        const matchesBrand = !selectedBrand || brand === selectedBrand;
+        const matchesColor = !selectedColor || colors.includes(selectedColor);
+
+        console.log('Matches Brand:', matchesBrand); // Check brand match
+        console.log('Matches Color:', matchesColor); // Check color match
+
+        if (matchesBrand && matchesColor) {
+            console.log(`Item ${item.dataset.id} is visible`); // Debug: Visible item
+            item.style.display = 'block';
+        } else {
+            console.log(`Item ${item.dataset.id} is hidden`); // Debug: Hidden item
+            item.style.display = 'none';
+        }
+      });
+    }
+
+    function applySort() {
+      const sortOption = document.getElementById('sort-options').value;
+      const grid = document.getElementById('item-grid');
+      const items = Array.from(grid.children);
+
+      // Sorting logic
+      items.sort((a, b) => {
+        if (sortOption === 'price-low') {
+            return parseFloat(a.dataset.price) - parseFloat(b.dataset.price);
+        } else if (sortOption === 'price-high') {
+            return parseFloat(b.dataset.price) - parseFloat(a.dataset.price);
+        } else if (sortOption === 'category') {
+            return a.dataset.category.localeCompare(b.dataset.category);
+        } else if (sortOption === 'color') {
+            return a.dataset.color.localeCompare(b.dataset.color);
+        } else if (sortOption === 'recent') {
+            return parseInt(b.dataset.id) - parseInt(a.dataset.id); // Assuming ID correlates to recency
+        }
+      });
+
+      // Append sorted items back to the grid
+      items.forEach(item => grid.appendChild(item));
+    }
+
+    const colors = [
+      { id: 1, name: 'Black', hex: '#000000' },
+      { id: 2, name: 'Blue', hex: '#0000FF' },
+      { id: 3, name: 'Brown', hex: '#A52A2A' },
+      { id: 4, name: 'Burgundy', hex: '#800020' },
+      { id: 5, name: 'Gray', hex: '#808080' },
+      { id: 6, name: 'Green', hex: '#008000' },
+      { id: 7, name: 'Navy', hex: '#000080' },
+      { id: 8, name: 'Orange', hex: '#FFA500' },
+      { id: 9, name: 'Pink', hex: '#FFC0CB' },
+      { id: 10, name: 'Purple', hex: '#800080' },
+      { id: 11, name: 'Red', hex: '#FF0000' },
+      { id: 12, name: 'Tan', hex: '#D2B48C' },
+      { id: 13, name: 'White', hex: '#FFFFFF' },
+      { id: 14, name: 'Yellow', hex: '#FFFF00' },
+    ];
+
+    function renderColorButtonsInModal() {
+      const colorContainer = document.getElementById('color-buttons-modal');
+      const modal = document.getElementById('editItemModal');
+      const selectedColorName = modal.dataset.selectedColorName;
+
+      console.log('Rendering Color Buttons. Selected Color:', selectedColorName); // Debug log
+
+      colorContainer.innerHTML = ''; // Clear existing buttons
+
+      colors.forEach(color => {
+        const button = document.createElement('div');
+        button.className = 'color-button';
+        button.dataset.colorName = color.name;
+
+        // Create the color square
+        const square = document.createElement('div');
+        square.className = 'color-square';
+        square.style.backgroundColor = color.hex;
+
+        // Create the color label
+        const label = document.createElement('span');
+        label.textContent = color.name;
+
+        // Append the square and label to the button
+        button.appendChild(square);
+        button.appendChild(label);
+
+        // Highlight the selected color by name (case-insensitive)
+        if (
+            selectedColorName &&
+            selectedColorName.toLowerCase() === color.name.toLowerCase()
+        ) {
+            console.log('Preselecting Color:', color.name); // Debug log
+            button.classList.add('selected');
+        }
+
+        // Add click event to select the color
+        button.onclick = () => {
+            selectColor(button, color.name);
+        };
+
+        colorContainer.appendChild(button);
+      });
+    }
+
+    function selectColor(button, colorName) {
+      const buttons = document.querySelectorAll('#color-buttons-modal .color-button');
+      buttons.forEach(btn => btn.classList.remove('selected'));
+      button.classList.add('selected');
+
+      // Update the hidden input field with the selected color name
+      document.getElementById('editItemColor').value = colorName;
+
+      console.log(`Selected Color: ${colorName}`);
+    }
+
+    // Function to select an existing brand
+    function selectBrand(brandName) {
+      // Update the value of the brand input field
+      const brandInput = document.getElementById('editItemBrand');
+      if (brandInput) {
+        brandInput.value = brandName;
+        console.log(`Brand selected: ${brandName}`); // Debug log
+      } else {
+        console.error('Brand input field not found!');
+      }
+    }
+
+    function deleteItem() {
+      const itemId = document.getElementById('deleteItemId').value;
+
+      if (!itemId) {
+        console.error("Delete Item ID is empty!");
+        return;
+      }
+
+      fetch(`/closet/delete-item/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ item_id: itemId })
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log(`Item with ID ${itemId} deleted successfully.`);
+          document.getElementById(`item-card-${itemId}`).remove(); // Remove the item from the grid
+          $('#editItemModal').modal('hide'); // Close the modal
+        } else {
+          console.error("Failed to delete item:", response.statusText);
+        }
+      })
+      .catch(error => console.error("Error deleting item:", error));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const deleteForm = document.getElementById('deleteItemForm');
+      console.log("Delete form on page load:", deleteForm); // Debug log
+    });
+
+    function submitDeleteForm() {
+      const deleteForm = document.getElementById('deleteItemForm');
+      const deleteItemId = document.getElementById('deleteItemId').value;
+
+      if (!deleteForm) {
+        console.error("Delete form not found in DOM!");
+        return;
+      }
+
+      if (!deleteItemId) {
+        console.error("Delete Item ID is empty!");
+        return;
+      }
+
+      console.log("Submitting Delete Form with ID:", deleteItemId);
+      deleteForm.submit();
+    }
+
+    function openEditModal(itemId) {
+      fetch(`/closet/get-item/${itemId}/`)
+        .then(response => response.json())
+        .then(data => {
+          console.log('API Response:', data); // Debug log
+
+          document.getElementById('editItemId').value = data.id;
+          document.getElementById('deleteItemId').value = data.id;
+          document.getElementById('editItemName').value = data.name;
+          document.getElementById('editItemBrand').value = data.brand ? data.brand.name : '';
+          document.getElementById('editItemPrice').value = data.price || '';
+          //document.getElementById('editItemCategory').value = data.category ? data.category.id : '';
+
+          // Handle `data.color` as an array and extract the first color name
+          const selectedColorName = Array.isArray(data.color) && data.color.length > 0 ? data.color[0] : null;
+
+          // Store the selected color name in the modal's dataset and hidden input
+          const modal = document.getElementById('editItemModal');
+          modal.dataset.selectedColorName = selectedColorName;
+
+          const colorInput = document.getElementById('editItemColor');
+          colorInput.value = selectedColorName; // Retain the preselected color
+
+          console.log('Selected Color Name:', modal.dataset.selectedColorName); // Debug log
+
+          // Render the color buttons
+          renderColorButtonsInModal();
+
+          // Handle category
+          const categoryId = data.category ? data.category.id : null;
+          document.getElementById('editItemCategory').value = categoryId; // Set hidden input with current category
+          if (categoryId) {
+            console.log('Fetching category path for categoryId:', categoryId);
+            fetchCategoryPath(categoryId); // Fetch and render the category path
+          } else {
+            console.log('No category found, fetching top-level categories.');
+            console.log('Calling fetchSubcategoriesForModal with null...');
+            fetchSubcategoriesForModal(null); // Fetch top-level categories
+          }
+
+          $('#editItemModal').modal('show');
+        })
+        .catch(error => console.error('Error fetching item data:', error));
+    }
+
+    function fetchCategoryPath(categoryId) {
+      console.log('Fetching category path for categoryId:', categoryId); // Debug log
+
+      fetch(`/closet/category-path/${categoryId}/`)
+        .then(response => response.json())
+        .then(data => {
+          console.log('Category path fetched:', data); // Debug log
+          categoryStateModal = data.path; // Set category hierarchy
+          renderCategoriesInModal();
+        })
+        .catch(error => console.error('Error fetching category path:', error));
+    }
+
+    let categoryStateModal = [];
+
+    function fetchSubcategoriesForModal(parentId = null, level = 0) {
+      console.log('Fetching subcategories for parentId:', parentId); // Debug log
+
+      const url = parentId ? `/closet/subcategories/${parentId}/` : `/closet/subcategories/`;
+      console.log('API URL:', url); // Debug log
+
+      fetch(url)
+        .then(response => {
+          console.log('Subcategories response status:', response.status); // Debug log
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Subcategories fetched:', data); // Debug log
+
+          // If no subcategories, do not replace the current state
+          if (data.subcategories && data.subcategories.length === 0) {
+            console.log('No further subcategories available for this level.');
+            // Optionally add a "No further subcategories" message at this level
+            renderCategoriesInModal(); // Render the existing categories
+            return;
+          }
+
+          // Update state and render subcategories
+          categoryStateModal = categoryStateModal.slice(0, level); // Trim to the current level
+          categoryStateModal.push(data.subcategories); // Add new subcategories
+          console.log('Updated categoryStateModal:', categoryStateModal);
+
+          renderCategoriesInModal(); // Render the categories
+        })
+        .catch(error => console.error('Error fetching subcategories:', error));
+    }
+
+    function renderCategoriesInModal() {
+      const container = document.getElementById('category-container-modal');
+      container.innerHTML = ''; // Clear the container
+
+      console.log('Rendering categories. Current state:', categoryStateModal); // Debug log
+
+      if (categoryStateModal.length === 0) {
+          console.warn('No categories to display.');
+          container.innerHTML = '<p>No categories available.</p>';
+          return;
+      }
+
+      // Loop through each level in `categoryStateModal`
+      categoryStateModal.forEach((subcategories, level) => {
+          const row = document.createElement('div');
+          row.className = 'category-row mt-2';
+
+          subcategories.forEach(subcategory => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-secondary m-1';
+            button.textContent = subcategory.name;
+            button.dataset.id = subcategory.id;
+
+            // Highlight the selected category
+            if (subcategory.selected) {
+              button.classList.add('active');
+            }
+
+            button.onclick = () => {
+              console.log('Selected category:', subcategory.name, 'ID:', subcategory.id); // Debug log
+              document.getElementById('editItemCategory').value = subcategory.id; // Store selected category
+              fetchSubcategoriesForModal(subcategory.id, level + 1); // Fetch next level
+            };
+
+            row.appendChild(button);
+          });
+
+        container.appendChild(row); // Add the row to the container
+      });
+
+      // Optionally add a message for levels with no further subcategories
+      if (categoryStateModal[categoryStateModal.length - 1].length === 0) {
+        const message = document.createElement('p');
+        message.className = 'text-muted mt-2';
+        message.textContent = 'No further subcategories available.';
+        container.appendChild(message);
+      }
+    }
+
+
+    function renderCategoriesInModal() {
+      const container = document.getElementById('category-container-modal');
+      container.innerHTML = ''; // Clear the container
+
+      console.log('Rendering categories. Current state:', categoryStateModal); // Debug log
+
+      if (categoryStateModal.length === 0 || categoryStateModal[0].length === 0) {
+        console.warn('No categories to display.');
+        container.innerHTML = '<p>No categories available.</p>'; // Debug fallback
+        return;
+      }
+
+      categoryStateModal.forEach((subcategories, level) => {
+        const row = document.createElement('div');
+        row.className = 'category-row mt-2';
+
+        subcategories.forEach(subcategory => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn btn-secondary m-1';
+          button.textContent = subcategory.name;
+          button.dataset.id = subcategory.id;
+
+          // Highlight the selected category
+          if (subcategory.selected) {
+            button.classList.add('active');
+          }
+
+          button.onclick = () => {
+            document.getElementById('editItemCategory').value = subcategory.id; // Store selected category
+            fetchSubcategoriesForModal(subcategory.id, level + 1); // Fetch next level
+          };
+
+          row.appendChild(button);
+        });
+
+        container.appendChild(row);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const notificationPopup = document.getElementById('notification-popup');
+      if (notificationPopup) {
+          setTimeout(() => {
+            notificationPopup.style.display = 'none';
+          }, 4000); // Hide after 4 seconds
+      }
+    });
+
+  </script>
+</body>
+</html>
+
+
+
+{% endblock %}
