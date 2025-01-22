@@ -1,20 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
-<!DOCTYPE html>
-<html lang="en">
-
 <head>
+  <title>Calendar</title>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Closet</title>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar/main.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar/locales-all.min.js"></script>
 </head>
 
 <body>
   <div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Calendar</h1>
+    <h1>My Closet Calendar</h1>
+    <div id="calendar"></div>
+
+    <!-- Modal for Logging Items -->
+    <div class="modal fade" id="logItemModal" tabindex="-1" aria-labelledby="logItemModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="logItemForm">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h5 class="modal-title" id="logItemModalLabel">Log Items Worn</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="selectedDate" name="date">
+              <div class="form-group">
+                <label for="items">Select Items:</label>
+                <div id="items">
+                  {% for item in items %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="item_ids" value="{{ item.id }}" id="item-{{ item.id }}">
+                    <label class="form-check-label" for="item-{{ item.id }}">
+                      <img src="{{ item.image.url }}" alt="{{ item.name }}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px;">
+                      {{ item.name }}
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="submit" class="btn btn-primary">Log Items</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const calendarEl = document.getElementById('calendar');
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'en',
+        selectable: true,
+        events: '/calendar/data/',
+        dateClick: function(info) {
+          document.getElementById('selectedDate').value = info.dateStr;
+          const modal = new bootstrap.Modal(document.getElementById('logItemModal'));
+          modal.show();
+        },
+        eventContent: function(eventInfo) {
+          let eventHtml = `<img src="${eventInfo.event.extendedProps.image}" alt="${eventInfo.event.title}" style="width: 30px; height: 30px; border-radius: 50%;">`;
+          eventHtml += `<span> ${eventInfo.event.title}</span>`;
+          return { html: eventHtml };
+        },
+      });
+
+      calendar.render();
+
+      // Handle form submission for logging items
+      document.getElementById('logItemForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        fetch('/calendar/log/', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            calendar.refetchEvents();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('logItemModal'));
+            modal.hide();
+          }
+        })
+        .catch(error => console.error('Error logging items:', error));
+      });
+    });
+  </script>
 </body>
-</html>
 {% endblock %}

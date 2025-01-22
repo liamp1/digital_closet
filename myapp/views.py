@@ -1,13 +1,49 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.contrib import messages
-from .models import Item, Category, Brand, Color
+from .models import Item, Category, Brand, Color, WornItem
 from django.core.serializers.json import DjangoJSONEncoder
 import json
 import logging
+from datetime import date
+from django.utils.dateparse import parse_datetime
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
+def calendar_view(request):
+    return render(request, 'calendar.html')
+
+def get_calendar_data(request):
+    start_date = parse_datetime(request.GET.get('start'))
+    end_date = parse_datetime(request.GET.get('end'))
+
+    worn_items = WornItem.objects.filter(date__range=(start_date, end_date)).select_related('item')
+    events = []
+
+    for worn_item in worn_items:
+        events.append({
+            'title': worn_item.item.name,
+            'start': worn_item.date.isoformat(),
+            'item_id': worn_item.item.id,
+            'image': worn_item.item.image.url if worn_item.item.image else None,
+        })
+
+    return JsonResponse({'events': events})
+
+def log_worn_items(request):
+    if request.method == 'POST':
+        selected_date = request.POST['date']
+        item_ids = request.POST.getlist('item_ids')
+
+        for item_id in item_ids:
+            item = Item.objects.get(id=item_id)
+            WornItem.objects.create(item=item, date=selected_date)
+            item.wear_count += 1
+            item.save()
+
+        return JsonResponse({'success': True})
 
 # home page
 def home(request):

@@ -38,3 +38,7 @@ class Item(models.Model):
     
     def __str__(self):
         return self.name if self.name else "Unnamed Item"
+    
+class WornItem(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="worn_logs")
+    date = models.DateField()  # The date the item was worn

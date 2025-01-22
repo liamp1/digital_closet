@@ -20,6 +20,9 @@ urlpatterns = [
     path('closet/subcategories/', views.get_subcategories, name='get_subcategories_root'),
     path('closet/subcategories/<int:parent_id>/', views.get_subcategories, name='get_subcategories'),
 
+    path('calendar/', views.calendar_view, name='calendar'),
+    path('calendar/data/', views.get_calendar_data, name='get_calendar_data'),
+    path('calendar/log/', views.log_worn_items, name='log_worn_items'),
 ]
 
 if settings.DEBUG:
