@@ -1,3 +1,11 @@
+from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+
+
+
+
+
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.contrib import messages
@@ -12,6 +20,38 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# Register User
+def register_view(request):
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)  # Log the user in
+            return redirect("closet")  # Redirect to closet page
+    else:
+        form = UserCreationForm()
+    return render(request, "register.html", {"form": form})
+
+# Login User
+def login_view(request):
+    if request.method == "POST":
+        form = AuthenticationForm(data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect("closet")
+    else:
+        form = AuthenticationForm()
+    return render(request, "login.html", {"form": form})
+
+# Logout User
+def logout_view(request):
+    logout(request)
+    return redirect("login")  # Redirect to login page after logout
+
+
+
+
 def get_dashboard_data(request):
     if request.method == 'GET':
         current_date = datetime.now()
@@ -19,12 +59,13 @@ def get_dashboard_data(request):
         current_year = current_date.year
 
         # Count unique days with logs in the current month
-        total_outfits = WornItem.objects.filter(date__year=current_year, date__month=current_month).values('date').distinct().count()
+        total_outfits = WornItem.objects.filter(user=request.user, date__year=current_year, date__month=current_month).values('date').distinct().count()
         print(f"Total Outfits This Month (Unique Days): {total_outfits}")  # Debug log
 
         # Get the most worn item
         most_worn_item = (
-            Item.objects.annotate(wear_count_max=Count('worn_logs'))
+            Item.objects.filter(user=request.user)
+            .annotate(wear_count_max=Count('worn_logs'))
             .order_by('-wear_count')
             .first()
         )
@@ -68,7 +109,10 @@ def get_calendar_data(request):
     end_date = request.GET.get('end', '').split('T')[0]
 
     #print(f"Start Date: {start_date}, End Date: {end_date}")  # Debug log
-    worn_items = WornItem.objects.filter(date__range=[start_date, end_date]).select_related('item')
+    worn_items = WornItem.objects.filter(
+        user=request.user,
+        date__range=[start_date, end_date]
+    ).select_related('item')
 
     events = []
     for worn_item in worn_items:
@@ -85,6 +129,8 @@ def get_calendar_data(request):
 
 
 
+
+
 def log_worn_items(request):
     if request.method == 'POST':
         try:
@@ -92,46 +138,49 @@ def log_worn_items(request):
             selected_date = data.get('date')
             item_ids = data.get('item_ids', [])
 
+            print(f"User: {request.user.username}")  # Debug log
             print(f"Selected Date: {selected_date}")  # Debug log
             print(f"Item IDs: {item_ids}")  # Debug log
 
             if not selected_date:
                 return JsonResponse({'success': False, 'message': 'Date is missing.'}, status=400)
 
-            # Remove all logs if no items are selected
+            # Remove all logs for the user if no items are selected
             if not item_ids:
-                logs_to_remove = WornItem.objects.filter(date=selected_date)
+                logs_to_remove = WornItem.objects.filter(user=request.user, date=selected_date)
                 for log in logs_to_remove:
                     log.item.wear_count = F('wear_count') - 1  # Decrement wear count
                     log.item.save()
                     log.delete()
                 return JsonResponse({'success': True, 'message': 'All items removed for the selected date.'})
 
-            # Fetch all existing WornItems for the date
-            existing_logs = WornItem.objects.filter(date=selected_date)
-            print(f"Existing Logs for {selected_date}: {[log.item.id for log in existing_logs]}")  # Debug log
+            # Fetch existing logs for the user on the selected date
+            existing_logs = WornItem.objects.filter(user=request.user, date=selected_date)
+            existing_item_ids = set(existing_logs.values_list('item_id', flat=True))
 
-            # Find items to remove (items that are no longer in the selection)
-            existing_item_ids = existing_logs.values_list('item_id', flat=True)
-            items_to_remove = set(existing_item_ids) - set(item_ids)
+            print(f"Existing Logs for {selected_date}: {existing_item_ids}")  # Debug log
+
+            # Identify items to remove (logged but not selected anymore)
+            items_to_remove = existing_item_ids - set(item_ids)
             print(f"Items to remove: {items_to_remove}")  # Debug log
 
-            # Remove logs and decrement wear count
             for item_id in items_to_remove:
-                item = Item.objects.get(id=item_id)
-                WornItem.objects.filter(item=item, date=selected_date).delete()
-                item.wear_count = F('wear_count') - 1  # Decrement wear_count
-                item.save()
+                item = Item.objects.filter(id=item_id, user=request.user).first()
+                if item:
+                    WornItem.objects.filter(item=item, user=request.user, date=selected_date).delete()
+                    item.wear_count = F('wear_count') - 1  # Decrement wear_count
+                    item.save()
 
-            # Add new items (items that are not already logged)
-            items_to_add = set(item_ids) - set(existing_item_ids)
+            # Identify items to add (newly selected items)
+            items_to_add = set(item_ids) - existing_item_ids
             print(f"Items to add: {items_to_add}")  # Debug log
 
             for item_id in items_to_add:
-                item = Item.objects.get(id=item_id)
-                WornItem.objects.create(item=item, date=selected_date)
-                item.wear_count = F('wear_count') + 1  # Increment wear_count
-                item.save()
+                item = Item.objects.filter(id=item_id, user=request.user).first()
+                if item:
+                    WornItem.objects.create(user=request.user, item=item, date=selected_date)
+                    item.wear_count = F('wear_count') + 1  # Increment wear_count
+                    item.save()
 
             return JsonResponse({'success': True, 'message': 'Items logged successfully.'})
 
@@ -145,13 +194,18 @@ def log_worn_items(request):
 
 
 
+
 # home page
 def home(request):
     return render(request, "home.html")
 
 # closet page
 def closet_view(request):
-    items = Item.objects.prefetch_related('color')  # Optimize query with prefetch_related
+    if not request.user.is_authenticated:
+        return redirect("login")  # Redirect to login if not authenticated
+
+
+    items = Item.objects.prefetch_related('color').filter(user=request.user)  # Optimize query with prefetch_related
     for item in items:
         # Safely extract color names into a separate attribute
         item.color_names = [color.name for color in item.color.all()] if item.color.exists() else []
@@ -199,6 +253,7 @@ def add_item(request):
 
         # create item
         item = Item.objects.create(
+            user=request.user,
             name=name, 
             category=category, 
             brand=brand, 

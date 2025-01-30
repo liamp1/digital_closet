@@ -25,6 +25,9 @@ urlpatterns = [
     path('calendar/log/', views.log_worn_items, name='log_worn_items'),
     path('calendar/dashboard-data/', views.get_dashboard_data, name='get_dashboard_data'),
 
+    path("register/", views.register_view, name="register"),
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
 ]
 
 if settings.DEBUG:

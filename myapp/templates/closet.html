@@ -180,24 +180,35 @@
           {% endfor %}
         </div>
         {% endif %}
+
+        {% if user.is_authenticated %}
+            <h2>Welcome, {{ user.username }}!</h2>
+            <a href="{% url 'logout' %}" class="btn btn-danger">Logout</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+        {% endif %}
+
+
         <div id="item-grid" class="item-grid">
           {% for item in items %}
-          <div id="item-card-{{ item.id }}" 
-               class="item-card" 
-               data-id="{{ item.id }}" 
-               data-price="{{ item.price|default:'' }}" 
-               data-category="{{ item.category.name|default:'' }}" 
-               data-color="{{ item.color_names|join:','|default:''|lower }}"
-               onclick="openEditModal('{{ item.id }}')">
-            {% if item.image %}
-            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
-            {% else %}
-            <div class="item-image" style="background-color: #e9ecef; display: flex; align-items: center; justify-content: center;">
-              <span>No Image</span>
+            {% if item.user == request.user %}  {# Ensure only the user's items show #}
+            <div id="item-card-{{ item.id }}" 
+                class="item-card" 
+                data-id="{{ item.id }}" 
+                data-price="{{ item.price|default:'' }}" 
+                data-category="{{ item.category.name|default:'' }}" 
+                data-color="{{ item.color_names|join:','|default:''|lower }}"
+                onclick="openEditModal('{{ item.id }}')">
+              {% if item.image %}
+              <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
+              {% else %}
+              <div class="item-image" style="background-color: #e9ecef; display: flex; align-items: center; justify-content: center;">
+                <span>No Image</span>
+              </div>
+              {% endif %}
+              <div class="item-brand">{{ item.brand.name }}</div>
             </div>
             {% endif %}
-            <div class="item-brand">{{ item.brand.name }}</div>
-          </div>
           {% endfor %}
         </div>
       </div>

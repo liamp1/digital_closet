@@ -27,6 +27,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+LOGIN_REDIRECT_URL = "/closet/"  # Redirect users after login
+LOGOUT_REDIRECT_URL = "/"  # Redirect users to home after logout
 
 # Application definition
 

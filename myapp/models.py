@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 
 # Create your models here.
@@ -25,6 +26,7 @@ class Brand(models.Model):
         return self.name
 
 class Item(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Link items to users
     name = models.CharField(max_length=100, null=True, blank=True)
     category = models.ForeignKey("Category", on_delete=models.SET_NULL, null=True, blank=True)
     color = models.ManyToManyField(Color)        # multiple colors per item
@@ -40,5 +42,6 @@ class Item(models.Model):
         return self.name if self.name else "Unnamed Item"
     
 class WornItem(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Associate logs with a user
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="worn_logs")
     date = models.DateField()  # The date the item was worn
