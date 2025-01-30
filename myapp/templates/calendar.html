@@ -1,20 +1,371 @@
 {% extends "base.html" %}
 {% block content %}
-<!DOCTYPE html>
-<html lang="en">
-
 <head>
+  <title>Calendar</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Closet</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar/main.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar/locales-all.min.js"></script>
+
+  <style>
+    .fc-event img {
+      display: inline-block;
+      vertical-align: middle;
+      border-radius: 4px;
+    }
+  
+    .fc-event-title {
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .card {
+      box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+
+    .card-header {
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #ddd;
+    }
+  </style>
+  
 </head>
 
 <body>
   <div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Calendar</h1>
+    <div class="row">
+      <div class="col-md-9">
+        <!-- Calendar Container -->
+        <div id="calendar"></div>
+      </div>
+      <div class="col-md-3">
+        <!-- Total Outfits This Month Card -->
+        <div class="card">
+          <div class="card-header">
+            <h5>Total Outfits This Month</h5>
+          </div>
+          <div class="card-body text-center">
+            <h3 id="total-outfits-count">0</h3>
+          </div>
+        </div>
+      
+        <!-- Most Worn Item Card -->
+        <div class="card mt-3">
+          <div class="card-header">
+            <h5>Most Worn Item</h5>
+          </div>
+          <div class="card-body text-center" id="most-worn-item-card">
+            {% if most_frequent_item %}
+              <img 
+                src="{{ most_frequent_item.image.url }}" 
+                alt="{{ most_frequent_item.name }}" 
+                class="img-fluid rounded mb-2" 
+                style="max-width: 100%; max-height: 200px;"
+              >
+              <h6>{{ most_frequent_item.name }}</h6>
+              <p>Wear Count: {{ most_frequent_item.wear_count }}</p>
+            {% else %}
+              <p>No items worn yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      
+      
+      
+      
     </div>
+
+    <!-- Modal for Logging Items -->
+    <div class="modal fade" id="logItemModal" tabindex="-1" aria-labelledby="logItemModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="logItemForm">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h5 class="modal-title" id="logItemModalLabel">Log Items Worn</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="selectedDate" name="date">
+              <div class="form-group">
+
+
+
+                <div id="items">
+                  {% for item in items %}
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      name="item_ids"
+                      value="{{ item.id }}"
+                      id="item-{{ item.id }}"
+                    >
+                    <label class="form-check-label" for="item-{{ item.id }}">
+                      <img src="{{ item.image.url }}" alt="{{ item.name }}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px;">
+                      {{ item.name }}
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+                
+
+
+
+
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button id="log-items-button" class="btn btn-primary" onclick="logItems()">Log Items</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+function logItems() {
+  console.log("Log Items button clicked."); // Debug log
+
+  const selectedDate = document.getElementById("selectedDate").value;
+
+  // Collect IDs of selected items from checkboxes in the modal
+  const itemIds = Array.from(
+    document.querySelectorAll("#logItemForm input[type='checkbox']:checked")
+  ).map((checkbox) => checkbox.value);
+
+  console.log("Selected Date:", selectedDate); // Debug log
+  console.log("Selected Item IDs:", itemIds); // Debug log
+
+  if (!selectedDate) {
+    console.error("No date selected.");
+    alert("Please select a date to log items.");
+    return;
+  }
+
+  // Allow empty itemIds to clear the log for the selected date
+  fetch("/calendar/log/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": "{{ csrf_token }}",
+    },
+    body: JSON.stringify({
+      date: selectedDate,
+      item_ids: itemIds,
+    }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        console.error("Failed to log items:", response.statusText);
+        return response.json().then((data) => {
+          console.error("Error message:", data.message);
+        });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log("Log Items Response:", data); // Debug log
+      if (data.success) {
+        console.log("Items logged successfully.");
+        // Refresh calendar events
+        if (calendar) {
+          calendar.refetchEvents();
+        }
+        // Update dashboard dynamically
+        updateDashboard();
+        // Close modal
+        const modalElement = document.getElementById("logItemModal");
+        if (modalElement) {
+          $(modalElement).modal("hide");
+        }
+      } else {
+        console.error("Error logging items:", data.message);
+      }
+    })
+    .catch((error) => console.error("Error logging items:", error));
+}
+
+
+
+
+
+
+function updateDashboard() {
+  console.log('Fetching dashboard data...');
+  fetch('/calendar/dashboard-data/')
+    .then(response => response.json())
+    .then(data => {
+      console.log('Dashboard Data:', data); // Debug log
+
+      // Update Total Outfits card
+      const totalOutfitsElement = document.getElementById('total-outfits-count');
+      if (totalOutfitsElement) {
+        console.log('Updating Total Outfits:', data.total_outfits); // Debug log
+        totalOutfitsElement.textContent = data.total_outfits || 0;
+      } else {
+        console.error('Total Outfits element not found.');
+      }
+
+      // Update Most Worn Item card
+      const mostWornItemCard = document.getElementById('most-worn-item-card');
+      if (mostWornItemCard) {
+        if (data.most_worn_item.id) {
+          const itemData = data.most_worn_item;
+          mostWornItemCard.innerHTML = `
+            <img 
+              src="${itemData.image || '/static/default-item.jpg'}" 
+              alt="${itemData.name}" 
+              class="img-fluid rounded mb-2" 
+              style="max-width: 100%; max-height: 200px;"
+            >
+            <h6>${itemData.name}</h6>
+            <p>Wear Count: ${itemData.wear_count}</p>
+          `;
+        } else {
+          mostWornItemCard.innerHTML = '<p>No items worn yet.</p>';
+        }
+      }
+    })
+    .catch(error => console.error('Error updating dashboard:', error));
+}
+
+
+
+
+
+
+
+
+document.getElementById('logItemForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const date = document.getElementById('selectedDate').value;
+  const payload = {
+    date: date,
+    item_ids: Array.from(selectedItems),
+  };
+
+  fetch('/calendar/log/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        console.log('Items logged successfully.');
+
+        // Refresh calendar events
+        if (calendar) {
+          calendar.refetchEvents();
+        }
+
+        // Update dashboard dynamically
+        updateDashboard();
+
+        // Close modal
+        $('#logItemModal').modal('hide');
+      } else {
+        console.error('Error logging items:', data.message);
+      }
+    })
+    .catch(error => console.error('Error logging items:', error));
+});
+
+
+
+
+
+
+
+
+let calendar; // Declare globally
+
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+
+  // Initialize FullCalendar
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'en',
+    selectable: true,
+    events: function (info, successCallback, failureCallback) {
+      fetch(`/calendar/data/?start=${info.startStr}&end=${info.endStr}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log('Fetched Events:', data.events); // Debug fetched events
+          successCallback(data.events);
+        })
+        .catch(error => {
+          console.error('Error fetching events:', error);
+          failureCallback(error);
+        });
+    },
+    dateClick: function (info) {
+      document.getElementById('selectedDate').value = info.dateStr;
+      fetchLoggedItems(info.dateStr); // Preselect logged items
+      $('#logItemModal').modal('show');
+    },
+    eventContent: function (eventInfo) {
+      const container = document.createElement('div');
+
+      // Add event image
+      if (eventInfo.event.extendedProps.image) {
+        const img = document.createElement('img');
+        img.src = eventInfo.event.extendedProps.image;
+        img.alt = eventInfo.event.title;
+        img.style.width = '20px';
+        img.style.height = '20px';
+        img.style.marginRight = '5px';
+        container.appendChild(img);
+      }
+
+      // Add event title
+      const title = document.createElement('span');
+      title.innerText = eventInfo.event.title;
+      container.appendChild(title);
+
+      return { domNodes: [container] };
+    },
+  });
+
+  calendar.render();
+});
+
+
+function fetchLoggedItems(date) {
+  fetch(`/calendar/data/?start=${date}&end=${date}`)
+    .then(response => response.json())
+    .then(data => {
+      const loggedItemIds = data.events.map(event => event.item_id);
+      console.log("Logged Item IDs:", loggedItemIds); // Debug log
+
+      document.querySelectorAll("#logItemForm input[type='checkbox']").forEach(input => {
+        input.checked = loggedItemIds.includes(parseInt(input.value));
+      });
+    })
+    .catch(error => console.error("Error fetching logged items:", error));
+}
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('Page loaded. Initializing dashboard update...');
+    updateDashboard();
+  });
+
+  </script>
 </body>
-</html>
 {% endblock %}
