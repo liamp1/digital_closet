@@ -1,0 +1,4 @@
+boto3==1.36.9
+Django==5.1.5
+django_storages==1.14.4
+python-dotenv==1.0.1

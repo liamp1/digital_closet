@@ -11,9 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-import os
 from storages.backends.s3boto3 import S3Boto3Storage
-
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # AWS CREDENTIALS
-AWS_STORAGE_BUCKET_NAME = "digital-closet-bucket"
-AWS_S3_REGION_NAME = "us-east-2"
-AWS_ACCESS_KEY_ID = "AKIAYXWBOIUDRDLH3GRH"
-AWS_SECRET_ACCESS_KEY = "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"
+load_dotenv()
+AWS_STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("REGION_NAME")
+AWS_ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
 
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
 
