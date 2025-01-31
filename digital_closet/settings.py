@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from storages.backends.s3boto3 import S3Boto3Storage
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,6 +21,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+
+# AWS CREDENTIALS
+load_dotenv()
+AWS_STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("REGION_NAME")
+AWS_ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
+
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+
+# Ensure Django stores files in S3 instead of locally
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+
+MEDIA_URL = f"{AWS_S3_CUSTOM_DOMAIN}/media/"
+MEDIA_ROOT = ""  # Empty string ensures Django does not store locally
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-c*z0#yh07*&zfwd97@zl1^m-e3=5f5i_ct@u#+gwfuhjq-f4%@'
@@ -39,7 +66,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "myapp"
+    "myapp",
+    "storages",
 ]
 
 MIDDLEWARE = [
@@ -72,8 +100,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'digital_closet.wsgi.application'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+
 
 
 # Database
