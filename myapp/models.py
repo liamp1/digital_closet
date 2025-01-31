@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.core.files.storage import default_storage
+from storages.backends.s3boto3 import S3Boto3Storage
 
 # Create your models here.
 
@@ -32,9 +34,11 @@ class Item(models.Model):
     color = models.ManyToManyField(Color)        # multiple colors per item
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True) 
     price = models.FloatField(null=True, blank=True)
-    wear_count = models.PositiveIntegerField(default=0)
-    image = models.ImageField(upload_to='item_images/', blank=True, null=True)
+    image = models.ImageField(storage=S3Boto3Storage(), upload_to="media/item_images/", blank=True, null=True)
 
+
+    wear_count = models.PositiveIntegerField(default=0)
+    
     def cost_per_wear(self):
         return self.price / self.wear_count if self.wear_count > 0 else 0
     

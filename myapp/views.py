@@ -1,6 +1,6 @@
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-
+from django.core.files.storage import default_storage
 
 
 
@@ -224,59 +224,56 @@ def closet_view(request):
 
 
 # add item page - accessed in the closet page
+
 def add_item(request):
-    # retrieve item data
     if request.method == 'POST':
         name = request.POST.get('name', None)
         category_id = request.POST.get('subcategory', None)
         brand_name = request.POST.get('brand', None)
-        color_id = request.POST.get('color', None)  # Get the color ID or None if not selected
-        price = request.POST.get('price', None)  # Get price or None if not provided
+        color_id = request.POST.get('color', None)
+        price = request.POST.get('price', None)
+        image = request.FILES.get("image")  # Image should be passed in request
 
-        # handle brand creation or selection (optional)
+        if not image:
+            messages.error(request, "No image uploaded!")
+            return redirect("closet")
+
+        print(f"Image Received: {image.name}")  # Debugging
+
         brand = None
         if brand_name:
             brand, _ = Brand.objects.get_or_create(name=brand_name)
 
-
-
-        # convert price to float if needed
         price = float(price) if price else None
+        category = Category.objects.filter(id=category_id).first() if category_id else None
 
-        # handle category
-        category = None
-        if category_id:
-            category = Category.objects.get(id=category_id)
-
-        # handle picture upload
-        image = request.FILES.get("image")
-
-        # create item
+        # Save Item (Image uploads to S3 automatically)
         item = Item.objects.create(
             user=request.user,
-            name=name, 
-            category=category, 
-            brand=brand, 
+            name=name,
+            category=category,
+            brand=brand,
             price=price,
-            image=image
+            image=image  # Automatically uses S3 storage
         )
-        # item.color.add(color)
-        if color_id:  # Check if a color was selected
+
+        if color_id:
             color = Color.objects.get(id=color_id)
-            item.color.add(color)  # Add the color to the item
+            item.color.add(color)
+
+        print(f"Item Created: {item}, Image URL: {item.image.url}")  # Debugging
 
         messages.success(request, "Item added successfully!")
-
         return redirect("closet")
 
-    categories = Category.objects.filter(parent=None)  # Top-level categories
+    categories = Category.objects.filter(parent=None)
     brands = Brand.objects.all()
-    colors = Color.objects.all()  # Fetch all colors
-    return render(request, 'add_item.html', {
-        'categories': categories,
-        'brands': brands,
-        'colors': colors,  # Pass colors to the template
-    })
+    colors = Color.objects.all()
+    return render(request, 'add_item.html', {'categories': categories, 'brands': brands, 'colors': colors})
+
+
+
+
 
 def get_item(request, item_id):
     item = Item.objects.get(id=item_id)
