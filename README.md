@@ -41,7 +41,7 @@ Follow these steps to set up the application:
 2. **Install Dependencies**
 
    ```sh
-   python manage.py migrate
+   pip install -r requirements.txt
    ```
 
 3. **Run the Application**
