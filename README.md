@@ -26,7 +26,7 @@
 
 ### Preface
 
-This application is currently designed to run locally on your machine. You must run the server on your local environment and access it via 127.0.0.1:8000. At this stage, the app is not publicly accessible online. However, future updates will include Docker deployment.
+This application is currently designed to run **locally** on your machine. You must run the server on your local environment and access it via `127.0.0.1:8000`. At this stage, the app is not publicly accessible online. However, future updates will include **Docker deployment**.
 
 ### Installation
 
